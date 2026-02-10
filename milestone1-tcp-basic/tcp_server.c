@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -6,6 +7,11 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
+#define TIMEOUT 120   // 2 minutes in seconds
+
+/*server waits for a client connection for 120 seconds. 
+    If no client connects, it closes the socket and exits.*/
+int8_t OnServer_for_Interval(int server_fd);
 
 int main() {
     int server_fd, new_socket;
@@ -37,6 +43,8 @@ int main() {
 
     printf("Server listening on port %d...\n", PORT);
 
+    (void)OnServer_for_Interval(server_fd);
+
     // Accept a client connection
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
                              (socklen_t*)&addrlen)) < 0) {
@@ -55,4 +63,24 @@ int main() {
     close(new_socket);
     close(server_fd);
     return 0;
+}
+
+int8_t OnServer_for_Interval(int server_fd)
+{
+    // Use select() to wait with timeout
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(server_fd, &readfds);
+
+    struct timeval tv;
+    tv.tv_sec = TIMEOUT;
+    tv.tv_usec = 0;
+
+    int8_t activity = select(server_fd + 1, &readfds, NULL, NULL, &tv);
+
+    if (activity == 0) {
+        printf("No client connected within %d seconds. Closing server.\n", TIMEOUT);
+        close(server_fd);
+        return 0;
+    }
 }
