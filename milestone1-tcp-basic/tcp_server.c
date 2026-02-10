@@ -53,7 +53,11 @@ int main() {
     }
 
     // Read message from client
-    read(new_socket, buffer, BUFFER_SIZE);
+    int bytes_read = read(new_socket, buffer, BUFFER_SIZE);
+    if (bytes_read < 0) {
+    perror("Read failed");
+    // handle error
+    }
     printf("Message from client: %s\n", buffer);
 
     // Send response
@@ -83,4 +87,5 @@ int8_t OnServer_for_Interval(int server_fd)
         close(server_fd);
         return 0;
     }
+    return 1;
 }

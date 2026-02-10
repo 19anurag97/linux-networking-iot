@@ -38,7 +38,11 @@ int main() {
     send(sock, hello, strlen(hello), 0);
 
     // Read response
-    read(sock, buffer, BUFFER_SIZE);
+    int bytes_read = read(sock, buffer, BUFFER_SIZE);
+    if (bytes_read < 0) {
+    perror("Read failed");
+    // handle error
+    }
     printf("Message from server: %s\n", buffer);
 
     close(sock);
