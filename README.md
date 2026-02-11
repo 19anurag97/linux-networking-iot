@@ -5,5 +5,5 @@
                            will close the socket descriptor and shows an error message.
 
 
-(B) milestone1-echo-server : Server echoes back whatever client sends. A simple username/password authentication
+(B) milestone2-echo-server : Server echoes back whatever client sends. A simple username/password authentication
                              step is added.
