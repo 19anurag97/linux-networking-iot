@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <jwt.h>
+#include <time.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -15,8 +17,9 @@
 // Hardcoded credentials
 #define USERNAME "anurag"
 #define PASSWORD "iot789"
+#define SECRET_KEY "mysecretkey123"
 
-bool Authenticate_Client(int fd_server, int cl_socket);
+bool Authenticate_Client(int fd_server, int cl_socket, jwt_t *Jauth);
 
 int main() {
     bool auth_state = 0U;
@@ -24,6 +27,7 @@ int main() {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
+    jwt_t *jwt = NULL; //jwt object.
 
     // Create socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -57,7 +61,7 @@ int main() {
     }
 
     // --- Authentication step ---
-    auth_state = Authenticate_Client(server_fd, new_socket);
+    auth_state = Authenticate_Client(server_fd, new_socket, jwt);
 
     // Echo loop
     while (auth_state == K_SUCCESS) {
@@ -67,10 +71,35 @@ int main() {
             printf("Client disconnected.\n");
             break;
         }
-        printf("Received: %s\n", buffer);
+        // Expect "JWT:message"
+        char *sep = strchr(buffer, ':');
+        if (!sep) continue;
+        *sep = '\0';
+        char *recv_jwt = buffer;
+        char *message = sep + 1;
 
-        // Echo back to client
-        send(new_socket, buffer, bytes_read, 0);
+        if (jwt_decode(&jwt, recv_jwt, (unsigned char*)SECRET_KEY, strlen(SECRET_KEY)) != 0) {
+            printf("Invalid JWT. Closing.\n");
+            break;
+        }
+
+        // Check expiry
+        time_t exp = jwt_get_grant_int(jwt, "exp");
+        if (time(NULL) > exp) {
+            printf("JWT expired. Closing.\n");
+            jwt_free(jwt);
+            break;
+        }
+
+        if (strcmp(message, "exit") == 0) {
+            printf("Exit received. Closing.\n");
+            jwt_free(jwt);
+            break;
+        }
+
+        printf("Received: %s\n", message);
+        send(new_socket, message, strlen(message), 0);
+        jwt_free(jwt);
     }
 
     close(new_socket);
@@ -78,7 +107,7 @@ int main() {
     return K_SUCCESS;
 }
 
-bool Authenticate_Client(int fd_server, int cl_socket)
+bool Authenticate_Client(int fd_server, int cl_socket, jwt_t *Jauth)
 {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE);
@@ -90,21 +119,35 @@ bool Authenticate_Client(int fd_server, int cl_socket)
         return K_FAILURE;
     }
 
-    // Expect "username:password"
-    buffer[bytes_read] = '\0';
-    printf("Auth attempt: %s\n", buffer);
-
     if (strcmp(buffer, USERNAME ":" PASSWORD) == 0) {
-        char *ok = "AUTH_OK";
-        send(cl_socket, ok, strlen(ok), 0);
-        printf("Client authenticated successfully.\n");
-    } else {
+        jwt_new(&Jauth);
+
+        // Add claims
+        jwt_add_grant(Jauth, "sub", USERNAME);
+        jwt_add_grant(Jauth, "role", "user"); //Role set as user.
+
+        // Expiry claim (60 seconds)
+        time_t exp = time(NULL) + 60;
+        jwt_add_grant_int(Jauth, "exp", exp);
+
+        // Sign JWT
+        jwt_set_alg(Jauth, JWT_ALG_HS256, (unsigned char*)SECRET_KEY, strlen(SECRET_KEY));
+        char *out = jwt_encode_str(Jauth);
+
+        send(cl_socket, out, strlen(out), 0);
+        printf("Issued JWT: %s\n", out);
+
+        jwt_free(Jauth);
+        free(out);
+    }
+    else
+    {
         char *fail = "AUTH_FAIL";
         send(cl_socket, fail, strlen(fail), 0);
-        printf("Authentication failed. Closing connection.\n");
         close(cl_socket);
         close(fd_server);
         return K_FAILURE;
     }
+
     return K_SUCCESS;
 }

@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <jwt.h>
+#include <time.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -13,6 +15,7 @@
 #define K_FAILURE 1
 
 bool Authenticate_Server(int t_sock);
+char jwt_token[BUFFER_SIZE];    //JWT rcvd from server.
 
 int main() {
     bool auth_state = 0;
@@ -52,17 +55,19 @@ int main() {
             perror("fgets failed");
             break;
         }
+        buffer[strcspn(buffer, "\n")] = '\0';
+        char message[BUFFER_SIZE * 2];
+        snprintf(message, sizeof(message), "%s:%s", jwt_token, buffer);
 
         // Send message
-        send(sock, buffer, strlen(buffer), 0);
+        send(sock, message, strlen(message), 0);
 
-        // Receive echo
+        if (strcmp(buffer, "exit") == 0) break;
+
         memset(buffer, 0, BUFFER_SIZE);
         int bytes_read = read(sock, buffer, BUFFER_SIZE);
-        if (bytes_read <= 0) {
-            printf("Server disconnected.\n");
-            break;
-        }
+        if (bytes_read <= 0) break;
+        buffer[bytes_read] = '\0';
         printf("Echoed: %s\n", buffer);
     }
 
@@ -96,11 +101,15 @@ bool Authenticate_Server(int t_sock)
 
     memset(buffer, 0, BUFFER_SIZE);
     int bytes_read = read(t_sock, buffer, BUFFER_SIZE);
-    if (bytes_read <= 0 || strcmp(buffer, "AUTH_OK") != 0) {
+    if (bytes_read <= 0 || (strcmp(buffer, "AUTH_FAIL") == 0)) {
         printf("Authentication failed. Exiting.\n");
         close(t_sock);
         return K_FAILURE;
     }
-    printf("Authenticated successfully!\n");
+    else    //JWT Token Rcvd.
+    {
+        strcpy(jwt_token, buffer); 
+    }
+    //printf("Authenticated successfully!\n");
     return K_SUCCESS;
 }
