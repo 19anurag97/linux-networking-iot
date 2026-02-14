@@ -14,3 +14,16 @@
 - Acknowledgments (ACKs): Server replies with an ACK for each message.
 - Timeouts: Client waits for ACK; if none arrives within X seconds, it retransmits.
 - Retries: Client retries a limited number of times before giving up.
+
+**Stop-and-Wait ARQ Basics**
+- Each packet carries a sequence number (0 or 1).
+- The receiver sends back an ACK with the same sequence number.
+- The sender waits for the ACK before sending the next packet.
+- If the ACK doesn’t arrive within a timeout → retransmit.
+- This prevents duplicates and ensures ordered delivery.
+
+*Purpose*
+- This is the **classic Stop-and-Wait ARQ design**:
+- Only two sequence numbers are needed (0 and 1).
+- They prevent duplicates: if the server sees the same sequence number twice, it knows the packet was retransmitted.
+- Once the correct ACK is received, the client toggles to the other sequence number for the next packet.

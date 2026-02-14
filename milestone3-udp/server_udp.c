@@ -9,7 +9,12 @@
 
 int main() {
     int sockfd;
+    int seq=0;
+    int expected_seq = 0;
+    int n=0;
     char buffer[BUFFER_SIZE];
+    char msg[BUFFER_SIZE];
+    char ack[BUFFER_SIZE+10];
     struct sockaddr_in servaddr, cliaddr;
 
     // Create UDP socket
@@ -38,20 +43,38 @@ int main() {
     // Echo loop
     while (1) {
         socklen_t len = sizeof(cliaddr);
-        int n = recvfrom(sockfd, buffer, BUFFER_SIZE, MSG_WAITALL,
+        n = recvfrom(sockfd, buffer, BUFFER_SIZE, MSG_WAITALL,
                          (struct sockaddr *)&cliaddr, &len);
         buffer[n] = '\0';
-        printf("Client: %s\n", buffer);
 
         // Exit condition
-        if (strcmp(buffer, "exit") == 0) {
+        if (strcmp(buffer, "exit") == 0)
+        {
             printf("Exit command received. Closing server.\n");
             break;
         }
 
+        //Sequencing
+        sscanf(buffer, "%d:%s", &seq, msg);
+        printf("Received [seq=%d]: %s\n", seq, msg);
+
+        if (seq == expected_seq)
+        {
+            // Process message
+            if (strcmp(msg, "exit") == 0)
+            {
+                printf("Exit command received. Closing server.\n");
+                break;
+            }
+            expected_seq = 1 - expected_seq; // toggle between 0 and 1
+        }
+        else 
+        {
+            printf("Duplicate packet ignored.\n");
+        }
+
         // Send ACK back
-        char ack[BUFFER_SIZE+10];
-        snprintf(ack, sizeof(ack), "ACK:%s", buffer);
+        snprintf(ack, sizeof(ack), "ACK:%d", seq);
         sendto(sockfd, ack, strlen(ack), MSG_CONFIRM,
                (struct sockaddr *)&cliaddr, len);
     }
