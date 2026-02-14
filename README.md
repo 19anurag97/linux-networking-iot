@@ -10,3 +10,7 @@
                              -> A simple username/password authentication step is added.
                              -> **Token-Based Authentication** added. *libjwt* included.
 
+(C) *milestone3-udp*     : Implement client-server using UDP sockets.
+                           -> Added classic Stop-and-Wait ARQ design. Since UDP itself is unreliable
+                              (no retransmissions, no ordering guarantees), Stop-and-Wait ARQ can be implemented
+                              at the application layer to add reliability.
