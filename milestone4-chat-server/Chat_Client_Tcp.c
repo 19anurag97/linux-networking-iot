@@ -7,6 +7,7 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
+#define MAX_USERNAME_LEN 32
 
 int main() {
     int sockfd;
@@ -29,18 +30,40 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Connected to chat server. Type messages:\n");
+    printf("Connected to chat server.\n");
+    printf("Enter your username (max 32 chars): ");
+    if (fgets(buffer, BUFFER_SIZE, stdin) == NULL)
+    {
+        perror("fgets failed");
+    }
+    buffer[strcspn(buffer, "\n")] = '\0';
+    //Validate Username length in client side.
+    if (strlen(buffer) == 0)
+    {
+        printf("Error: Username cannot be empty.\n");
+        return 1;
+    }
+    
+    if (strlen(buffer) > MAX_USERNAME_LEN)
+    {
+        buffer[MAX_USERNAME_LEN] = '\0'; // truncate safely
+        printf("Username too long, truncated to: %s\n", buffer);
+    }
+    
+    send(sockfd, buffer, strlen(buffer), 0);
 
     fd_set readfds;
     int maxfd = sockfd > STDIN_FILENO ? sockfd : STDIN_FILENO;
 
-    while (1) {
+    while (1) 
+    {
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);       // watch server socket
         FD_SET(STDIN_FILENO, &readfds); // watch keyboard input
 
         // Wait for activity on either stdin or socket
-        if (select(maxfd + 1, &readfds, NULL, NULL, NULL) < 0) {
+        if (select(maxfd + 1, &readfds, NULL, NULL, NULL) < 0)
+        {
             perror("select error");
             break;
         }
@@ -52,7 +75,6 @@ int main() {
                 break;
             }
             buffer[strcspn(buffer, "\n")] = '\0';
-
             send(sockfd, buffer, strlen(buffer), 0);
 
             if (strcmp(buffer, "exit") == 0) {
