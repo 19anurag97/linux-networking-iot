@@ -4,13 +4,18 @@
 #include <string.h>
 
 #define ADDRESS     "tcp://localhost:1884"
-#define CLIENTID    "ExampleClientPub"
+#define CLIENTID    "PublisherClient"
 #define TIMEOUT     10000L
 
 // Define topics as macros
 #define TOPIC1      "chat/sensor1"
 #define TOPIC2      "chat/sensor2"
 #define TOPIC3      "chat/sensor3"
+
+// Delivery complete callback
+void deliveryComplete(void *context, MQTTClient_deliveryToken dt) {
+    printf("Delivery confirmed for token %d\n", dt);
+}
 
 int main() {
     MQTTClient client;
@@ -23,6 +28,9 @@ int main() {
 
     MQTTClient_create(&client, ADDRESS, CLIENTID,
                       MQTTCLIENT_PERSISTENCE_NONE, NULL);
+
+    // Register the delivery callback
+    MQTTClient_setCallbacks(client, NULL, NULL, NULL, deliveryComplete);
 
     if (MQTTClient_connect(client, &conn_opts) != MQTTCLIENT_SUCCESS) {
         printf("Failed to connect\n");
@@ -65,7 +73,7 @@ int main() {
         printf("Message published to [%s] with QoS %d: %s\n",
                topic, qos_choice, buffer);
 
-        MQTTClient_waitForCompletion(client, token, TIMEOUT);
+        // MQTTClient_waitForCompletion(client, token, TIMEOUT); // Wait for delivery confirmation (optional, since we have a callback)
     }
 
     MQTTClient_disconnect(client, 10000);
